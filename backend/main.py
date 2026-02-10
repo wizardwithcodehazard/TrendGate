@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -44,6 +44,14 @@ class HashtagCompareInput(BaseModel):
 class TrendAnalysisInput(BaseModel):
     """Input schema for trend file analysis."""
     trend_name: Optional[str] = Field(None, description="Specific trend to analyze")
+    include_ai_explanation: bool = Field(False, description="Include Gemini AI explanation")
+
+class MetricExplainInput(BaseModel):
+    """Input schema for metric explanation."""
+    trend_name: str
+    current_metrics: dict
+    peak_metrics: Optional[dict] = None
+    archetype: Optional[str] = None
 
 # --- FASTAPI APP ---
 
@@ -184,6 +192,28 @@ async def analyze_campaign(campaign: CampaignInput):
     
     return result
 
+@app.post("/api/campaign/deep-analyze")
+async def deep_analyze_campaign(campaign: CampaignInput):
+    """
+    Deep analysis with Serper web search + Gemini AI.
+    Provides real market data, competitors, risks, and AI insights.
+    """
+    advisor = get_gemini_advisor()
+    
+    result = advisor.deep_analyze_campaign(
+        topic=campaign.topic,
+        hashtags=campaign.hashtags,
+        platform=campaign.platform,
+        campaign_aim=campaign.campaign_aim,
+        target_audience=campaign.target_audience,
+        planned_duration_days=campaign.planned_duration_days
+    )
+    
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    
+    return result
+
 @app.post("/api/campaign/health")
 async def check_trend_health(input: TrendHealthInput):
     """
@@ -204,6 +234,57 @@ async def compare_hashtags(input: HashtagCompareInput):
     """
     advisor = get_gemini_advisor()
     result = advisor.compare_hashtags(input.hashtags, input.platform)
+    
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    
+    return result
+
+@app.post("/api/campaign/analyze-post")
+async def analyze_post(
+    file: UploadFile = File(...),
+    platform: str = Form("instagram"),
+    caption: str = Form(None),
+    hashtags: str = Form(None)
+):
+    """
+    Analyze an uploaded campaign post image using Gemini vision.
+    """
+    advisor = get_gemini_advisor()
+    
+    # Read file bytes
+    image_data = await file.read()
+    mime_type = file.content_type or "image/jpeg"
+    
+    # Parse hashtags from comma-separated string
+    hashtag_list = [h.strip() for h in hashtags.split(",")] if hashtags else None
+    
+    result = advisor.analyze_post(
+        image_data=image_data,
+        mime_type=mime_type,
+        caption=caption,
+        hashtags=hashtag_list,
+        platform=platform
+    )
+    
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    
+    return result
+
+@app.post("/api/trends/explain-metrics")
+async def explain_metrics(input: MetricExplainInput):
+    """
+    Get AI-powered explanation of why metrics changed.
+    """
+    advisor = get_gemini_advisor()
+    
+    result = advisor.explain_metrics(
+        trend_name=input.trend_name,
+        current_metrics=input.current_metrics,
+        peak_metrics=input.peak_metrics,
+        archetype=input.archetype
+    )
     
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])

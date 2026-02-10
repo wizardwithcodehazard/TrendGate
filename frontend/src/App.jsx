@@ -1,11 +1,278 @@
-import { useState, useEffect } from 'react';
-import { Rocket, TrendingUp, TrendingDown, Search, BarChart3, Zap, Shield, AlertTriangle, CheckCircle, Activity, PieChart, RefreshCw, ChevronDown } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart as RechartsPie, Pie, Cell, Legend, BarChart, Bar } from 'recharts';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Rocket, TrendingUp, TrendingDown, Search, BarChart3, Zap, Shield,
+  AlertTriangle, CheckCircle, Activity, PieChart as PieIcon, RefreshCw,
+  ChevronDown, Upload, Image, X, Sparkles, ArrowUpRight, ArrowDownRight,
+  Brain, Target, Clock, Users, FileImage, Hash, MessageSquare
+} from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, PieChart as RechartsPie, Pie, Cell, Legend
+} from 'recharts';
 import api from './api/client';
 import './index.css';
 
-// --- CAMPAIGN FORM COMPONENT ---
-function CampaignForm({ onSubmit, loading }) {
+// --- API CLIENT UPDATE ---
+const apiClient = {
+  ...api,
+  analyzePost: async (formData) => {
+    const response = await fetch('/api/campaign/analyze-post', {
+      method: 'POST',
+      body: formData
+    });
+    if (!response.ok) throw new Error('Post analysis failed');
+    return response.json();
+  },
+  explainMetrics: async (data) => {
+    const response = await fetch('/api/trends/explain-metrics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Metric explanation failed');
+    return response.json();
+  }
+};
+
+// --- POST UPLOAD COMPONENT ---
+function PostUpload({ onAnalysis, loading }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [caption, setCaption] = useState('');
+  const [hashtags, setHashtags] = useState('');
+  const [platform, setPlatform] = useState('instagram');
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setDragActive(false);
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile && droppedFile.type.startsWith('image/')) {
+      setFile(droppedFile);
+      setPreview(URL.createObjectURL(droppedFile));
+    }
+  }, []);
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      setPreview(URL.createObjectURL(selectedFile));
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('platform', platform);
+    if (caption) formData.append('caption', caption);
+    if (hashtags) formData.append('hashtags', hashtags);
+
+    onAnalysis(formData);
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    setPreview(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Dropzone */}
+      {!preview ? (
+        <div
+          className={`dropzone ${dragActive ? 'active' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={handleDrop}
+          onClick={() => document.getElementById('file-input').click()}
+        >
+          <Upload className="w-12 h-12 mx-auto text-neutral-500 mb-4" />
+          <p className="text-neutral-400 mb-2">Drag & drop your post image</p>
+          <p className="text-neutral-600 text-sm">or click to browse</p>
+          <input
+            id="file-input"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
+      ) : (
+        <div className="relative">
+          <img
+            src={preview}
+            alt="Preview"
+            className="w-full h-64 object-cover rounded-xl border border-neutral-800"
+          />
+          <button
+            onClick={clearFile}
+            className="absolute top-3 right-3 p-2 bg-black/80 rounded-full hover:bg-black transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Caption & Hashtags */}
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm text-neutral-400 mb-2">Caption</label>
+          <textarea
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder="Enter your post caption..."
+            rows={2}
+            className="input resize-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-neutral-400 mb-2">Hashtags</label>
+            <input
+              type="text"
+              value={hashtags}
+              onChange={(e) => setHashtags(e.target.value)}
+              placeholder="#fashion, #style"
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-neutral-400 mb-2">Platform</label>
+            <select
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              className="input"
+            >
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="twitter">X (Twitter)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Analyze Button */}
+      <button
+        onClick={handleSubmit}
+        disabled={!file || loading}
+        className="btn-primary w-full flex items-center justify-center gap-2"
+      >
+        {loading ? (
+          <>
+            <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+            Analyzing...
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-5 h-5" />
+            Analyze Post with AI
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+// --- POST ANALYSIS RESULT ---
+function PostAnalysisResult({ result }) {
+  if (!result) return null;
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Scores Grid */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="metric-card">
+          <div className="metric-value">{result.visual_score || 0}</div>
+          <div className="metric-label">Visual Score</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-value">{result.engagement_score || 0}</div>
+          <div className="metric-label">Engagement Score</div>
+        </div>
+      </div>
+
+      {/* Content Analysis */}
+      <div className="glass p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <FileImage className="w-5 h-5 text-neutral-400" />
+          <h3 className="font-semibold">Content Analysis</h3>
+        </div>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-neutral-400">Content Type</span>
+            <span className="capitalize">{result.content_type}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-neutral-400">Engagement Prediction</span>
+            <span className={`badge ${result.predicted_engagement === 'high' ? 'badge-success' :
+              result.predicted_engagement === 'medium' ? 'badge-warning' : 'badge-danger'
+              }`}>
+              {result.predicted_engagement}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-neutral-400">Viral Potential</span>
+            <span>{((result.viral_potential || 0) * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Strengths & Weaknesses */}
+      <div className="grid grid-cols-2 gap-4">
+        {result.strengths?.length > 0 && (
+          <div className="glass p-5">
+            <h4 className="text-sm font-medium text-neutral-400 mb-3">Strengths</h4>
+            <ul className="space-y-2">
+              {result.strengths.slice(0, 3).map((s, i) => (
+                <li key={i} className="text-sm flex items-start gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  {s}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {result.improvements?.length > 0 && (
+          <div className="glass p-5">
+            <h4 className="text-sm font-medium text-neutral-400 mb-3">Improvements</h4>
+            <ul className="space-y-2">
+              {result.improvements.slice(0, 3).map((s, i) => (
+                <li key={i} className="text-sm flex items-start gap-2">
+                  <ArrowUpRight className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                  {s}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Hashtag Suggestions */}
+      {result.hashtag_suggestions?.length > 0 && (
+        <div className="glass p-5">
+          <h4 className="text-sm font-medium text-neutral-400 mb-3 flex items-center gap-2">
+            <Hash className="w-4 h-4" />
+            Suggested Hashtags
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {result.hashtag_suggestions.map((tag, i) => (
+              <span key={i} className="px-3 py-1 bg-neutral-800 rounded-full text-sm">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- CAMPAIGN FORM ---
+function CampaignForm({ onSubmit, onDeepSubmit, loading, deepLoading }) {
   const [formData, setFormData] = useState({
     topic: '',
     hashtags: '',
@@ -15,6 +282,7 @@ function CampaignForm({ onSubmit, loading }) {
     planned_duration_days: 30,
     additional_context: ''
   });
+  const [deepMode, setDeepMode] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -22,119 +290,122 @@ function CampaignForm({ onSubmit, loading }) {
       ...formData,
       hashtags: formData.hashtags.split(',').map(h => h.trim()).filter(h => h)
     };
-    onSubmit(data);
+    if (deepMode) {
+      onDeepSubmit(data);
+    } else {
+      onSubmit(data);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Topic */}
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">Campaign Topic *</label>
+        <label className="block text-sm text-neutral-400 mb-2">Campaign Topic</label>
         <input
           type="text"
           required
           value={formData.topic}
           onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
           placeholder="e.g., Summer Fashion Collection 2025"
-          className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500 transition-all"
+          className="input"
         />
       </div>
 
-      {/* Hashtags */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">Hashtags (comma-separated) *</label>
+        <label className="block text-sm text-neutral-400 mb-2">Hashtags</label>
         <input
           type="text"
           required
           value={formData.hashtags}
           onChange={(e) => setFormData({ ...formData, hashtags: e.target.value })}
           placeholder="#SummerVibes, #OOTD, #Fashion2025"
-          className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500 transition-all"
+          className="input"
         />
       </div>
 
-      {/* Platform & Duration */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Platform *</label>
+          <label className="block text-sm text-neutral-400 mb-2">Platform</label>
           <select
             value={formData.platform}
             onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-            className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-indigo-500 text-white transition-all"
+            className="input"
           >
             <option value="instagram">Instagram</option>
             <option value="tiktok">TikTok</option>
             <option value="twitter">X (Twitter)</option>
             <option value="youtube">YouTube</option>
-            <option value="linkedin">LinkedIn</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Duration (days)</label>
+          <label className="block text-sm text-neutral-400 mb-2">Duration</label>
           <input
             type="number"
             min="7"
             max="365"
             value={formData.planned_duration_days}
             onChange={(e) => setFormData({ ...formData, planned_duration_days: parseInt(e.target.value) })}
-            className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-indigo-500 text-white transition-all"
+            className="input"
           />
         </div>
       </div>
 
-      {/* Campaign Aim */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">Campaign Aim *</label>
+        <label className="block text-sm text-neutral-400 mb-2">Campaign Aim</label>
         <input
           type="text"
           required
           value={formData.campaign_aim}
           onChange={(e) => setFormData({ ...formData, campaign_aim: e.target.value })}
-          placeholder="e.g., Increase brand awareness, drive product sales"
-          className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500 transition-all"
+          placeholder="e.g., Increase brand awareness"
+          className="input"
         />
       </div>
 
-      {/* Target Audience */}
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">Target Audience *</label>
+        <label className="block text-sm text-neutral-400 mb-2">Target Audience</label>
         <input
           type="text"
           required
           value={formData.target_audience}
           onChange={(e) => setFormData({ ...formData, target_audience: e.target.value })}
           placeholder="e.g., 18-25 females interested in fashion"
-          className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500 transition-all"
+          className="input"
         />
       </div>
 
-      {/* Additional Context */}
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">Additional Context</label>
-        <textarea
-          value={formData.additional_context}
-          onChange={(e) => setFormData({ ...formData, additional_context: e.target.value })}
-          placeholder="Any other relevant information about your campaign..."
-          rows={3}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-white placeholder-slate-500 transition-all resize-none"
-        />
+      {/* Deep Analysis Toggle */}
+      <div className="flex items-center justify-between p-4 bg-neutral-900 rounded-xl border border-neutral-800">
+        <div className="flex items-center gap-3">
+          <Search className="w-5 h-5 text-blue-400" />
+          <div>
+            <div className="font-medium text-sm">Deep Market Research</div>
+            <div className="text-xs text-neutral-500">Uses Serper to search real market data</div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setDeepMode(!deepMode)}
+          className={`w-12 h-6 rounded-full transition-colors relative ${deepMode ? 'bg-blue-500' : 'bg-neutral-700'}`}
+        >
+          <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${deepMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
+        </button>
       </div>
 
-      {/* Submit Button */}
       <button
         type="submit"
-        disabled={loading}
-        className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+        disabled={loading || deepLoading}
+        className="btn-primary w-full flex items-center justify-center gap-2"
       >
-        {loading ? (
+        {loading || deepLoading ? (
           <>
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            Analyzing with AI...
+            <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+            {deepLoading ? 'Deep Analyzing...' : 'Analyzing...'}
           </>
         ) : (
           <>
-            <Rocket className="w-5 h-5" />
-            Analyze Campaign
+            {deepMode ? <Search className="w-5 h-5" /> : <Rocket className="w-5 h-5" />}
+            {deepMode ? 'Deep Analyze with Serper' : 'Analyze Campaign'}
           </>
         )}
       </button>
@@ -142,136 +413,349 @@ function CampaignForm({ onSubmit, loading }) {
   );
 }
 
-// --- VIABILITY SCORE COMPONENT ---
+// --- DEEP ANALYSIS RESULTS ---
+function DeepAnalysisResults({ results }) {
+  if (!results) return null;
+
+  const aiInsights = results.ai_insights || {};
+
+  return (
+    <div className="space-y-5 animate-fadeIn">
+      {/* Viability Score */}
+      <div className="glass p-6">
+        <ViabilityScore score={results.viability_score || aiInsights.viability_score || 50} />
+      </div>
+
+      {/* AI Summary */}
+      {aiInsights.summary && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <Brain className="w-5 h-5 text-purple-500" />
+            AI Summary
+          </h3>
+          <p className="text-neutral-300 text-sm leading-relaxed">{aiInsights.summary}</p>
+        </div>
+      )}
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="metric-card">
+          <div className="metric-value capitalize text-lg">{aiInsights.market_status || '—'}</div>
+          <div className="metric-label">Market Status</div>
+        </div>
+        <div className="metric-card">
+          <div className={`metric-value capitalize text-lg ${aiInsights.timing_verdict === 'optimal' ? 'text-green-500' :
+            aiInsights.timing_verdict === 'risky' ? 'text-yellow-500' :
+              aiInsights.timing_verdict === 'avoid' ? 'text-red-500' : ''
+            }`}>
+            {aiInsights.timing_verdict || '—'}
+          </div>
+          <div className="metric-label">Timing</div>
+        </div>
+        <div className="metric-card">
+          <div className={`metric-value capitalize text-lg ${results.risk_analysis?.risk_level === 'high' ? 'text-red-500' :
+            results.risk_analysis?.risk_level === 'medium' ? 'text-yellow-500' : 'text-green-500'
+            }`}>
+            {results.risk_analysis?.risk_level || '—'}
+          </div>
+          <div className="metric-label">Risk Level</div>
+        </div>
+      </div>
+
+      {/* Timing Reason */}
+      {aiInsights.timing_reason && (
+        <div className="glass p-5 border-l-4 border-blue-500">
+          <h4 className="text-sm font-medium text-neutral-400 mb-2 flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            Timing Assessment
+          </h4>
+          <p className="text-sm text-neutral-300">{aiInsights.timing_reason}</p>
+        </div>
+      )}
+
+      {/* Market Research */}
+      {results.market_research?.news?.length > 0 && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Search className="w-5 h-5 text-blue-500" />
+            Market Research
+            <span className="text-xs text-neutral-500 font-normal">via Serper</span>
+          </h3>
+          <div className="space-y-3">
+            {results.market_research.news.slice(0, 4).map((news, idx) => (
+              <a
+                key={idx}
+                href={news.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block p-3 bg-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors"
+              >
+                <div className="font-medium text-sm mb-1 line-clamp-1">{news.title}</div>
+                <div className="text-xs text-neutral-500 line-clamp-2">{news.snippet}</div>
+                <div className="text-xs text-neutral-600 mt-2">{news.source} • {news.date}</div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Competitor Analysis */}
+      {results.competitor_analysis?.results?.length > 0 && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-orange-500" />
+            Competitor Activity
+          </h3>
+          {aiInsights.competitor_insights && (
+            <p className="text-sm text-neutral-400 mb-4">{aiInsights.competitor_insights}</p>
+          )}
+          <div className="space-y-2">
+            {results.competitor_analysis.results.slice(0, 3).map((comp, idx) => (
+              <a
+                key={idx}
+                href={comp.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-3 p-3 bg-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors"
+              >
+                <div className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-xs flex-shrink-0">
+                  {idx + 1}
+                </div>
+                <div>
+                  <div className="font-medium text-sm line-clamp-1">{comp.title}</div>
+                  <div className="text-xs text-neutral-500 line-clamp-1">{comp.snippet}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Real Risks */}
+      {(results.risk_analysis?.controversies?.length > 0 || aiInsights.real_risks?.length > 0) && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            Identified Risks
+          </h3>
+          <div className="space-y-3">
+            {/* From search */}
+            {results.risk_analysis?.controversies?.slice(0, 2).map((risk, idx) => (
+              <div key={`s-${idx}`} className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <div className="font-medium text-sm text-red-400 mb-1">{risk.title}</div>
+                <div className="text-xs text-neutral-500">{risk.snippet}</div>
+              </div>
+            ))}
+            {/* From AI */}
+            {aiInsights.real_risks?.slice(0, 3).map((risk, idx) => (
+              <div key={`ai-${idx}`} className="p-3 bg-neutral-900 rounded-lg">
+                <div className="font-medium text-sm mb-1">{risk.risk}</div>
+                <div className="text-xs text-neutral-500 mb-2">{risk.source}</div>
+                <div className="text-xs text-green-500/80">
+                  <strong>Mitigation:</strong> {risk.mitigation}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Opportunities */}
+      {aiInsights.opportunities?.length > 0 && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Target className="w-5 h-5 text-green-500" />
+            Opportunities
+          </h3>
+          <ul className="space-y-2">
+            {aiInsights.opportunities.map((opp, idx) => (
+              <li key={idx} className="flex items-start gap-3 text-sm text-neutral-300">
+                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                {opp}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Recommendations */}
+      {aiInsights.recommendations?.length > 0 && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-yellow-500" />
+            AI Recommendations
+          </h3>
+          <div className="space-y-3">
+            {aiInsights.recommendations.map((rec, idx) => (
+              <div key={idx} className="p-4 bg-neutral-900 rounded-lg">
+                <div className="flex items-start justify-between mb-2">
+                  <span className="font-medium text-sm">{rec.action}</span>
+                  <span className={`badge ${rec.priority === 'high' ? 'badge-danger' :
+                    rec.priority === 'medium' ? 'badge-warning' : 'badge-success'
+                    }`}>
+                    {rec.priority}
+                  </span>
+                </div>
+                <div className="text-xs text-neutral-500">{rec.reason}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Social Discussions */}
+      {results.social_discussions?.reddit?.length > 0 && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-orange-500" />
+            Social Discussions
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Reddit */}
+            <div>
+              <div className="text-xs text-neutral-500 mb-2 uppercase tracking-wide">Reddit</div>
+              <div className="space-y-2">
+                {results.social_discussions.reddit.slice(0, 2).map((item, idx) => (
+                  <a
+                    key={idx}
+                    href={item.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-2 bg-neutral-900 rounded-lg text-xs hover:bg-neutral-800 transition-colors"
+                  >
+                    <div className="line-clamp-2">{item.title}</div>
+                  </a>
+                ))}
+              </div>
+            </div>
+            {/* Twitter */}
+            {results.social_discussions?.twitter?.length > 0 && (
+              <div>
+                <div className="text-xs text-neutral-500 mb-2 uppercase tracking-wide">Twitter/X</div>
+                <div className="space-y-2">
+                  {results.social_discussions.twitter.slice(0, 2).map((item, idx) => (
+                    <a
+                      key={idx}
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-2 bg-neutral-900 rounded-lg text-xs hover:bg-neutral-800 transition-colors"
+                    >
+                      <div className="line-clamp-2">{item.title}</div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- VIABILITY SCORE ---
 function ViabilityScore({ score }) {
   const getColor = () => {
-    if (score >= 70) return 'from-emerald-500 to-teal-500';
-    if (score >= 40) return 'from-amber-500 to-orange-500';
-    return 'from-red-500 to-rose-500';
-  };
-
-  const getLabel = () => {
-    if (score >= 70) return 'High Potential';
-    if (score >= 40) return 'Moderate Risk';
-    return 'High Risk';
+    if (score >= 70) return '#22c55e';
+    if (score >= 40) return '#eab308';
+    return '#ef4444';
   };
 
   return (
-    <div className="relative">
-      <div className="text-center mb-4">
-        <div className={`text-6xl font-bold bg-gradient-to-r ${getColor()} bg-clip-text text-transparent`}>
-          {score}
-        </div>
-        <div className="text-slate-400 text-sm uppercase tracking-wider mt-1">{getLabel()}</div>
+    <div className="text-center">
+      <div
+        className="text-7xl font-bold mb-2"
+        style={{ color: getColor() }}
+      >
+        {score}
       </div>
-      <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+      <div className="text-neutral-500 text-sm uppercase tracking-wide">
+        Viability Score
+      </div>
+      <div className="mt-4 h-2 bg-neutral-800 rounded-full overflow-hidden">
         <div
-          className={`h-full bg-gradient-to-r ${getColor()} transition-all duration-1000`}
-          style={{ width: `${score}%` }}
+          className="h-full transition-all duration-1000"
+          style={{ width: `${score}%`, backgroundColor: getColor() }}
         />
       </div>
     </div>
   );
 }
 
-// --- RISK FACTOR COMPONENT ---
-function RiskFactor({ risk, severity, mitigation }) {
-  const severityStyles = {
-    high: 'risk-high',
-    medium: 'risk-medium',
-    low: 'risk-low'
-  };
-
-  return (
-    <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-400" />
-          <span className="font-medium text-white">{risk}</span>
-        </div>
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${severityStyles[severity] || severityStyles.medium}`}>
-          {severity}
-        </span>
-      </div>
-      {mitigation && (
-        <p className="text-sm text-slate-400 mt-2">{mitigation}</p>
-      )}
-    </div>
-  );
-}
-
-// --- ANALYSIS RESULTS COMPONENT ---
+// --- ANALYSIS RESULTS ---
 function AnalysisResults({ results }) {
   if (!results) return null;
 
   return (
-    <div className="space-y-6 animate-fadeIn">
-      {/* Viability Score Card */}
-      <div className="glass rounded-2xl p-6 text-center">
-        <h3 className="text-lg font-semibold text-slate-300 mb-4">Campaign Viability Score</h3>
+    <div className="space-y-5 animate-fadeIn">
+      <div className="glass p-6">
         <ViabilityScore score={results.viability_score || 50} />
       </div>
 
-      {/* Summary */}
       {results.summary && (
-        <div className="glass rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-400" />
-            Executive Summary
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-yellow-500" />
+            Summary
           </h3>
-          <p className="text-slate-300 leading-relaxed">{results.summary}</p>
+          <p className="text-neutral-300 text-sm leading-relaxed">{results.summary}</p>
         </div>
       )}
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="glass rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-indigo-400">{results.predicted_lifecycle_days || '—'}</div>
-          <div className="text-sm text-slate-400">Predicted Days</div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="metric-card">
+          <div className="metric-value">{results.predicted_lifecycle_days || '—'}</div>
+          <div className="metric-label">Predicted Days</div>
         </div>
-        <div className="glass rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-cyan-400 capitalize">{results.market_status || '—'}</div>
-          <div className="text-sm text-slate-400">Market Status</div>
+        <div className="metric-card">
+          <div className="metric-value capitalize text-lg">{results.market_status || '—'}</div>
+          <div className="metric-label">Market Status</div>
         </div>
-        <div className="glass rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-purple-400 capitalize">
+        <div className="metric-card">
+          <div className="metric-value capitalize text-lg">
             {results.competitive_analysis?.market_saturation || '—'}
           </div>
-          <div className="text-sm text-slate-400">Saturation</div>
+          <div className="metric-label">Saturation</div>
         </div>
       </div>
 
-      {/* Risk Factors */}
-      {results.risk_factors && results.risk_factors.length > 0 && (
-        <div className="glass rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Shield className="w-5 h-5 text-red-400" />
+      {results.risk_factors?.length > 0 && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-red-500" />
             Risk Factors
           </h3>
           <div className="space-y-3">
-            {results.risk_factors.slice(0, 5).map((rf, idx) => (
-              <RiskFactor
-                key={idx}
-                risk={typeof rf === 'string' ? rf : rf.risk}
-                severity={rf.severity || 'medium'}
-                mitigation={rf.mitigation}
-              />
+            {results.risk_factors.slice(0, 4).map((rf, idx) => (
+              <div key={idx} className="flex items-start justify-between p-3 bg-neutral-900 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5" />
+                  <span className="text-sm">{typeof rf === 'string' ? rf : rf.risk}</span>
+                </div>
+                {rf.severity && (
+                  <span className={`badge ${rf.severity === 'high' ? 'badge-danger' :
+                    rf.severity === 'medium' ? 'badge-warning' : 'badge-success'
+                    }`}>
+                    {rf.severity}
+                  </span>
+                )}
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Recommendations */}
-      {results.recommendations && results.recommendations.length > 0 && (
-        <div className="glass rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-emerald-400" />
+      {results.recommendations?.length > 0 && (
+        <div className="glass p-5">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500" />
             Recommendations
           </h3>
-          <ul className="space-y-3">
+          <ul className="space-y-2">
             {results.recommendations.slice(0, 5).map((rec, idx) => (
-              <li key={idx} className="flex items-start gap-3 text-slate-300">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-sm flex items-center justify-center font-medium">
+              <li key={idx} className="flex items-start gap-3 text-sm text-neutral-300">
+                <span className="w-6 h-6 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center text-xs flex-shrink-0">
                   {idx + 1}
                 </span>
                 {rec}
@@ -280,68 +764,96 @@ function AnalysisResults({ results }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Optimal Launch Window */}
-      {results.optimal_launch_window && (
-        <div className="glass rounded-2xl p-6 border-l-4 border-indigo-500">
-          <h3 className="text-lg font-semibold text-white mb-2">🚀 Optimal Launch Window</h3>
-          <p className="text-slate-300">{results.optimal_launch_window}</p>
+// --- METRIC EXPLANATION CARD ---
+function MetricExplanation({ metric, analysis }) {
+  if (!analysis) return null;
+
+  const data = analysis.metric_analysis?.[metric];
+  if (!data) return null;
+
+  const getStatusIcon = (status) => {
+    if (status === 'growing') return <ArrowUpRight className="w-4 h-4 text-green-500" />;
+    if (status === 'declining') return <ArrowDownRight className="w-4 h-4 text-red-500" />;
+    return <Activity className="w-4 h-4 text-neutral-500" />;
+  };
+
+  return (
+    <div className="p-4 bg-neutral-900 rounded-xl border border-neutral-800">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="capitalize font-medium">{metric}</span>
+          {getStatusIcon(data.status)}
+        </div>
+        <span className={`badge ${data.status === 'growing' ? 'badge-success' :
+          data.status === 'declining' ? 'badge-danger' : 'badge-neutral'
+          }`}>
+          {data.status}
+        </span>
+      </div>
+      <p className="text-sm text-neutral-400 mb-2">{data.explanation}</p>
+      {data.cause && (
+        <div className="text-xs text-neutral-500 mt-2">
+          <strong>Cause:</strong> {data.cause}
+        </div>
+      )}
+      {data.action && (
+        <div className="text-xs text-green-500/80 mt-1">
+          <strong>Action:</strong> {data.action}
         </div>
       )}
     </div>
   );
 }
 
-// --- TREND LIFECYCLE CHART ---
+// --- STATE COLORS ---
 const STATE_COLORS = {
   Emerging: '#22d3ee',
-  Growth: '#10b981',
-  Peak: '#8b5cf6',
-  Saturation: '#f59e0b',
+  Growth: '#22c55e',
+  Peak: '#a855f7',
+  Saturation: '#eab308',
   Decline: '#ef4444'
 };
 
+// --- TREND LIFECYCLE CHART ---
 function TrendLifecycleChart({ data }) {
-  if (!data || data.length === 0) return null;
+  if (!data?.length) return null;
 
   return (
-    <div className="h-80">
+    <div className="h-72">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
           <defs>
-            <linearGradient id="velocityGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+            <linearGradient id="velocityG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#ffffff" stopOpacity={0} />
             </linearGradient>
-            <linearGradient id="fatigueGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="retentionGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            <linearGradient id="fatigueG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
           <XAxis
             dataKey="date"
-            stroke="#64748b"
-            tick={{ fontSize: 12 }}
-            tickFormatter={(val) => val ? val.slice(5, 10) : ''}
+            stroke="#525252"
+            tick={{ fontSize: 11 }}
+            tickFormatter={(val) => val?.slice(5, 10) || ''}
           />
-          <YAxis stroke="#64748b" tick={{ fontSize: 12 }} domain={[0, 1]} />
+          <YAxis stroke="#525252" tick={{ fontSize: 11 }} domain={[0, 1]} />
           <Tooltip
             contentStyle={{
-              backgroundColor: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: '12px',
-              color: '#f8fafc'
+              backgroundColor: '#141414',
+              border: '1px solid #262626',
+              borderRadius: '8px',
+              color: '#fff'
             }}
-            labelStyle={{ color: '#94a3b8' }}
           />
-          <Area type="monotone" dataKey="velocity" stroke="#6366f1" strokeWidth={2} fill="url(#velocityGradient)" name="Velocity" />
-          <Area type="monotone" dataKey="fatigue" stroke="#f59e0b" strokeWidth={2} fill="url(#fatigueGradient)" name="Fatigue" />
-          <Area type="monotone" dataKey="retention" stroke="#10b981" strokeWidth={2} fill="url(#retentionGradient)" name="Retention" />
+          <Area type="monotone" dataKey="velocity" stroke="#fff" strokeWidth={2} fill="url(#velocityG)" name="Velocity" />
+          <Area type="monotone" dataKey="fatigue" stroke="#ef4444" strokeWidth={2} fill="url(#fatigueG)" name="Fatigue" />
           <Legend />
         </AreaChart>
       </ResponsiveContainer>
@@ -349,30 +861,26 @@ function TrendLifecycleChart({ data }) {
   );
 }
 
-// --- STATE DISTRIBUTION PIE CHART ---
+// --- STATE PIE CHART ---
 function StateDistributionChart({ distribution }) {
   if (!distribution) return null;
 
   const data = Object.entries(distribution).map(([name, value]) => ({
-    name,
-    value,
-    color: STATE_COLORS[name] || '#64748b'
+    name, value, color: STATE_COLORS[name] || '#525252'
   }));
 
   return (
-    <div className="h-64">
+    <div className="h-56">
       <ResponsiveContainer width="100%" height="100%">
         <RechartsPie>
           <Pie
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={60}
-            outerRadius={80}
-            paddingAngle={5}
+            innerRadius={50}
+            outerRadius={70}
+            paddingAngle={3}
             dataKey="value"
-            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-            labelLine={{ stroke: '#64748b' }}
           >
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
@@ -380,42 +888,45 @@ function StateDistributionChart({ distribution }) {
           </Pie>
           <Tooltip
             contentStyle={{
-              backgroundColor: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: '12px',
-              color: '#f8fafc'
+              backgroundColor: '#141414',
+              border: '1px solid #262626',
+              borderRadius: '8px'
             }}
           />
         </RechartsPie>
       </ResponsiveContainer>
+      <div className="flex flex-wrap gap-3 justify-center mt-2">
+        {Object.entries(STATE_COLORS).map(([state, color]) => (
+          <div key={state} className="flex items-center gap-1.5 text-xs">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+            <span className="text-neutral-400">{state}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// --- TRENDS DASHBOARD COMPONENT ---
+// --- TRENDS DASHBOARD ---
 function TrendsDashboard() {
   const [trends, setTrends] = useState([]);
   const [selectedTrend, setSelectedTrend] = useState(null);
   const [trendAnalysis, setTrendAnalysis] = useState(null);
+  const [metricExplanation, setMetricExplanation] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [loadingList, setLoadingList] = useState(false);
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load trends list on mount
   useEffect(() => {
     loadTrends();
   }, []);
 
   const loadTrends = async () => {
-    setLoadingList(true);
-    setError(null);
     try {
       const data = await api.listTrends();
       setTrends(data.trends || []);
     } catch (err) {
-      setError('Failed to load trends. Make sure the backend is running on port 8000.');
-    } finally {
-      setLoadingList(false);
+      setError('Failed to load trends');
     }
   };
 
@@ -423,11 +934,25 @@ function TrendsDashboard() {
     setLoading(true);
     setError(null);
     setTrendAnalysis(null);
+    setMetricExplanation(null);
+
     try {
       const data = await api.analyzeTrend(trendName);
       setTrendAnalysis(data);
+
+      // Get AI explanation for metrics if decline detected
+      if (data.decline_detected && data.decline_info?.metrics) {
+        setLoadingExplanation(true);
+        const explanation = await apiClient.explainMetrics({
+          trend_name: trendName,
+          current_metrics: data.decline_info.metrics,
+          archetype: data.decline_info.archetype
+        });
+        setMetricExplanation(explanation);
+        setLoadingExplanation(false);
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Analysis failed');
+      setError(err.message || 'Analysis failed');
     } finally {
       setLoading(false);
     }
@@ -440,179 +965,191 @@ function TrendsDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Trend Selector */}
-      <div className="glass rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
+      {/* Header */}
+      <div className="glass p-6">
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-2xl font-bold text-white">Trend Analytics Dashboard</h2>
-            <p className="text-slate-400 mt-1">Select a meme or hashtag to analyze its lifecycle</p>
+            <h2 className="text-2xl font-bold">Trend Analytics</h2>
+            <p className="text-neutral-500 text-sm mt-1">Select a trend to analyze its lifecycle</p>
           </div>
-          <button
-            onClick={loadTrends}
-            disabled={loadingList}
-            className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 transition-all"
-          >
-            <RefreshCw className={`w-5 h-5 text-slate-400 ${loadingList ? 'animate-spin' : ''}`} />
+          <button onClick={loadTrends} className="btn-secondary p-3">
+            <RefreshCw className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Trend Selector Dropdown */}
         <div className="relative">
           <select
             value={selectedTrend || ''}
             onChange={(e) => handleTrendSelect(e.target.value)}
-            className="w-full px-6 py-4 rounded-xl bg-slate-800/80 border border-slate-700 focus:border-indigo-500 text-white text-lg font-medium appearance-none cursor-pointer transition-all hover:bg-slate-700/80"
+            className="input text-lg"
           >
-            <option value="">🔍 Select a Trend/Meme to Analyze...</option>
-            {trends.map((trend, idx) => (
-              <option key={idx} value={trend.trend_name}>
-                {trend.trend_name} {trend.archetype ? `(${trend.archetype})` : ''} — {trend.data_points} days
+            <option value="">Select a trend...</option>
+            {trends.map((t, i) => (
+              <option key={i} value={t.trend_name}>
+                {t.trend_name} ({t.archetype || 'unknown'}) — {t.data_points} days
               </option>
             ))}
           </select>
-          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
         </div>
 
         {/* Quick Stats */}
         {trends.length > 0 && (
-          <div className="grid grid-cols-4 gap-4 mt-6">
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-              <div className="text-3xl font-bold text-indigo-400">{trends.length}</div>
-              <div className="text-sm text-slate-400">Total Trends</div>
+          <div className="grid grid-cols-4 gap-3 mt-5">
+            <div className="metric-card">
+              <div className="metric-value">{trends.length}</div>
+              <div className="metric-label">Trends</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-              <div className="text-3xl font-bold text-emerald-400">
+            <div className="metric-card">
+              <div className="metric-value text-red-500">
                 {trends.filter(t => t.archetype === 'viral_crash').length}
               </div>
-              <div className="text-sm text-slate-400">Viral Crashes</div>
+              <div className="metric-label">Viral Crashes</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-              <div className="text-3xl font-bold text-amber-400">
+            <div className="metric-card">
+              <div className="metric-value text-yellow-500">
                 {trends.filter(t => t.archetype === 'controversy_spike').length}
               </div>
-              <div className="text-sm text-slate-400">Controversies</div>
+              <div className="metric-label">Controversies</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-              <div className="text-3xl font-bold text-purple-400">
+            <div className="metric-card">
+              <div className="metric-value">
                 {trends.reduce((sum, t) => sum + (t.data_points || 0), 0)}
               </div>
-              <div className="text-sm text-slate-400">Total Data Points</div>
+              <div className="metric-label">Data Points</div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Error Display */}
       {error && (
-        <div className="glass rounded-2xl p-6 border-l-4 border-red-500">
-          <h3 className="text-red-400 font-semibold mb-2">Error</h3>
-          <p className="text-slate-300">{error}</p>
+        <div className="glass p-5 border-l-4 border-red-500">
+          <p className="text-red-400">{error}</p>
         </div>
       )}
 
-      {/* Loading State */}
       {loading && (
-        <div className="glass rounded-2xl p-12 text-center pulse-glow">
-          <div className="w-16 h-16 mx-auto mb-4 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-          <h3 className="text-xl font-semibold text-white mb-2">Analyzing Trend</h3>
-          <p className="text-slate-400">Running HMM inference and investigating decline...</p>
+        <div className="glass p-12 text-center pulse-glow">
+          <div className="loader mx-auto mb-4" />
+          <p className="text-neutral-400">Analyzing trend...</p>
         </div>
       )}
 
-      {/* Analysis Results */}
       {!loading && trendAnalysis && (
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Lifecycle Chart */}
-          <div className="glass rounded-2xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-indigo-400" />
-              Trend Lifecycle ({trendAnalysis.trend_name})
+          <div className="glass p-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-neutral-400" />
+              Lifecycle ({trendAnalysis.trend_name})
             </h3>
             <TrendLifecycleChart data={trendAnalysis.lifecycle_data} />
           </div>
 
           {/* State Distribution */}
-          <div className="glass rounded-2xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <PieChart className="w-5 h-5 text-purple-400" />
-              HMM State Distribution
+          <div className="glass p-6">
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <PieIcon className="w-5 h-5 text-neutral-400" />
+              State Distribution
             </h3>
             <StateDistributionChart distribution={trendAnalysis.state_distribution} />
-
-            {/* State Legend */}
-            <div className="flex flex-wrap gap-3 mt-4 justify-center">
-              {Object.entries(STATE_COLORS).map(([state, color]) => (
-                <div key={state} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-sm text-slate-400">{state}</span>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Decline Detection */}
           {trendAnalysis.decline_detected && trendAnalysis.decline_info && (
-            <div className="glass rounded-2xl p-6 lg:col-span-2 border-l-4 border-red-500">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <TrendingDown className="w-5 h-5 text-red-400" />
-                ⚠️ Decline Detected on {trendAnalysis.decline_info.date}
+            <div className="glass p-6 lg:col-span-2 border-l-4 border-red-500">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <TrendingDown className="w-5 h-5 text-red-500" />
+                Decline Detected — {trendAnalysis.decline_info.date}
               </h3>
 
               <div className="grid md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-800/50 rounded-xl p-4">
-                  <div className="text-sm text-slate-400 mb-1">State</div>
-                  <div className="text-xl font-bold" style={{ color: STATE_COLORS[trendAnalysis.decline_info.state] }}>
+                <div className="metric-card">
+                  <div className="metric-value" style={{ color: STATE_COLORS[trendAnalysis.decline_info.state] }}>
                     {trendAnalysis.decline_info.state}
                   </div>
+                  <div className="metric-label">State</div>
                 </div>
-                <div className="bg-slate-800/50 rounded-xl p-4">
-                  <div className="text-sm text-slate-400 mb-1">Velocity</div>
-                  <div className="text-xl font-bold text-indigo-400">
-                    {(trendAnalysis.decline_info.metrics?.velocity * 100).toFixed(1)}%
-                  </div>
+                <div className="metric-card">
+                  <div className="metric-value">{(trendAnalysis.decline_info.metrics?.velocity * 100).toFixed(0)}%</div>
+                  <div className="metric-label">Velocity</div>
                 </div>
-                <div className="bg-slate-800/50 rounded-xl p-4">
-                  <div className="text-sm text-slate-400 mb-1">Fatigue</div>
-                  <div className="text-xl font-bold text-amber-400">
-                    {(trendAnalysis.decline_info.metrics?.fatigue * 100).toFixed(1)}%
-                  </div>
+                <div className="metric-card">
+                  <div className="metric-value text-red-400">{(trendAnalysis.decline_info.metrics?.fatigue * 100).toFixed(0)}%</div>
+                  <div className="metric-label">Fatigue</div>
                 </div>
               </div>
 
-              {/* AI Explanation */}
-              {trendAnalysis.decline_info.investigation?.explanation && (
-                <div className="bg-slate-800/30 rounded-xl p-4">
-                  <h4 className="text-sm font-medium text-slate-300 mb-2">AI Analysis</h4>
-                  <p className="text-slate-400 text-sm leading-relaxed">
-                    {typeof trendAnalysis.decline_info.investigation.explanation === 'string'
-                      ? trendAnalysis.decline_info.investigation.explanation.slice(0, 500)
-                      : 'Analysis complete'}
-                    ...
-                  </p>
+              {/* AI Metric Explanations */}
+              {loadingExplanation && (
+                <div className="flex items-center gap-3 p-4 bg-neutral-900 rounded-xl">
+                  <Brain className="w-5 h-5 text-purple-500 animate-pulse" />
+                  <span className="text-neutral-400">Getting AI explanation...</span>
+                </div>
+              )}
+
+              {metricExplanation && !loadingExplanation && (
+                <div className="space-y-4 mt-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Brain className="w-5 h-5 text-purple-500" />
+                    <h4 className="font-medium">AI Metric Analysis</h4>
+                    <span className={`badge ${metricExplanation.overall_health === 'healthy' ? 'badge-success' :
+                      metricExplanation.overall_health === 'warning' ? 'badge-warning' : 'badge-danger'
+                      }`}>
+                      {metricExplanation.overall_health}
+                    </span>
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-3">
+                    {['velocity', 'fatigue', 'retention'].map(metric => (
+                      <MetricExplanation
+                        key={metric}
+                        metric={metric}
+                        analysis={metricExplanation}
+                      />
+                    ))}
+                  </div>
+
+                  {metricExplanation.causal_chain && (
+                    <div className="p-4 bg-neutral-900 rounded-xl">
+                      <h5 className="text-sm font-medium text-neutral-400 mb-2">Causal Chain</h5>
+                      <p className="text-sm">{metricExplanation.causal_chain}</p>
+                    </div>
+                  )}
+
+                  {metricExplanation.recovery_actions?.length > 0 && (
+                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
+                      <h5 className="text-sm font-medium text-green-400 mb-2">Recovery Actions</h5>
+                      <ul className="space-y-1">
+                        {metricExplanation.recovery_actions.slice(0, 3).map((action, i) => (
+                          <li key={i} className="text-sm text-neutral-300 flex items-start gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                            {action}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* No Decline Message */}
-          {trendAnalysis && !trendAnalysis.decline_detected && (
-            <div className="glass rounded-2xl p-6 lg:col-span-2 border-l-4 border-emerald-500">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-400" />
-                ✅ No Decline Detected - Trend is Healthy!
-              </h3>
-              <p className="text-slate-400 mt-2">This trend is still in a growth or peak phase.</p>
+          {!trendAnalysis.decline_detected && (
+            <div className="glass p-6 lg:col-span-2 border-l-4 border-green-500">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-green-500" />
+                <span className="font-semibold">Trend is Healthy</span>
+              </div>
+              <p className="text-neutral-400 mt-2 text-sm">No decline detected in this trend.</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Empty State */}
       {!loading && !trendAnalysis && !error && (
-        <div className="glass rounded-2xl p-12 text-center">
-          <BarChart3 className="w-16 h-16 mx-auto text-slate-600 mb-4" />
-          <h3 className="text-xl font-semibold text-slate-400 mb-2">Select a Trend to Analyze</h3>
-          <p className="text-slate-500">Choose a meme or hashtag from the dropdown above to see its lifecycle analysis</p>
+        <div className="glass p-12 text-center">
+          <BarChart3 className="w-12 h-12 mx-auto text-neutral-700 mb-4" />
+          <p className="text-neutral-500">Select a trend to analyze</p>
         </div>
       )}
     </div>
@@ -622,20 +1159,59 @@ function TrendsDashboard() {
 // --- MAIN APP ---
 function App() {
   const [activeTab, setActiveTab] = useState('campaign');
+  const [activeSubTab, setActiveSubTab] = useState('form');
   const [loading, setLoading] = useState(false);
+  const [deepLoading, setDeepLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const [deepResults, setDeepResults] = useState(null);
+  const [postResults, setPostResults] = useState(null);
   const [error, setError] = useState(null);
 
   const handleCampaignSubmit = async (data) => {
     setLoading(true);
     setError(null);
     setResults(null);
-
+    setDeepResults(null);
     try {
       const result = await api.analyzeCampaign(data);
       setResults(result);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Analysis failed');
+      setError(err.response?.data?.detail || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeepCampaignSubmit = async (data) => {
+    setDeepLoading(true);
+    setError(null);
+    setResults(null);
+    setDeepResults(null);
+    try {
+      const response = await fetch('/api/campaign/deep-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error('Deep analysis failed');
+      const result = await response.json();
+      setDeepResults(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeepLoading(false);
+    }
+  };
+
+  const handlePostAnalysis = async (formData) => {
+    setLoading(true);
+    setError(null);
+    setPostResults(null);
+    try {
+      const result = await apiClient.analyzePost(formData);
+      setPostResults(result);
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -644,81 +1220,114 @@ function App() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-slate-800/50 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-neutral-800 sticky top-0 z-50 bg-black/90 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-black" />
             </div>
             <div>
-              <h1 className="text-xl font-bold gradient-text">TrendGuard</h1>
-              <p className="text-xs text-slate-500">AI Campaign Advisor</p>
+              <h1 className="text-lg font-bold">TrendGuard</h1>
+              <p className="text-xs text-neutral-500">AI Campaign Advisor</p>
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <nav className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('campaign')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'campaign'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
-            >
-              <Rocket className="w-4 h-4 inline mr-2" />
-              Campaign Advisor
-            </button>
-            <button
-              onClick={() => setActiveTab('trends')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === 'trends'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
-            >
-              <BarChart3 className="w-4 h-4 inline mr-2" />
-              Trend Dashboard
-            </button>
+          <nav className="flex gap-1">
+            {[
+              { id: 'campaign', icon: Rocket, label: 'Campaign' },
+              { id: 'trends', icon: BarChart3, label: 'Trends' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeTab === tab.id
+                  ? 'bg-white text-black'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+                  }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            ))}
           </nav>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      {/* Main */}
+      <main className="max-w-6xl mx-auto px-6 py-8">
         {activeTab === 'campaign' && (
           <div className="grid lg:grid-cols-2 gap-8">
-            {/* Left: Form */}
-            <div className="glass rounded-2xl p-8">
+            <div className="glass p-7">
               <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white mb-2">Pre-Launch Campaign Analysis</h2>
-                <p className="text-slate-400">Get AI-powered predictions before you launch. Our system uses real-time market data to forecast success.</p>
+                <h2 className="text-xl font-bold mb-2">Campaign Analysis</h2>
+                <p className="text-neutral-500 text-sm">Get AI predictions before launch</p>
               </div>
-              <CampaignForm onSubmit={handleCampaignSubmit} loading={loading} />
+
+              {/* Sub tabs */}
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => setActiveSubTab('form')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeSubTab === 'form' ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-white'
+                    }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Details
+                </button>
+                <button
+                  onClick={() => setActiveSubTab('upload')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeSubTab === 'upload' ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-white'
+                    }`}
+                >
+                  <Image className="w-4 h-4" />
+                  Upload Post
+                </button>
+              </div>
+
+              {activeSubTab === 'form' && (
+                <CampaignForm
+                  onSubmit={handleCampaignSubmit}
+                  onDeepSubmit={handleDeepCampaignSubmit}
+                  loading={loading}
+                  deepLoading={deepLoading}
+                />
+              )}
+              {activeSubTab === 'upload' && (
+                <PostUpload onAnalysis={handlePostAnalysis} loading={loading} />
+              )}
             </div>
 
-            {/* Right: Results */}
             <div>
               {error && (
-                <div className="glass rounded-2xl p-6 border-l-4 border-red-500 mb-6">
-                  <h3 className="text-red-400 font-semibold mb-2">Analysis Error</h3>
-                  <p className="text-slate-300">{error}</p>
+                <div className="glass p-5 border-l-4 border-red-500 mb-6">
+                  <p className="text-red-400">{error}</p>
                 </div>
               )}
 
-              {loading && (
-                <div className="glass rounded-2xl p-12 text-center pulse-glow">
-                  <div className="w-16 h-16 mx-auto mb-4 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-                  <h3 className="text-xl font-semibold text-white mb-2">Analyzing Campaign</h3>
-                  <p className="text-slate-400">Searching real-time market data with Google...</p>
+              {(loading || deepLoading) && (
+                <div className="glass p-12 text-center pulse-glow">
+                  <div className="loader mx-auto mb-4" />
+                  <p className="text-neutral-400">
+                    {deepLoading ? 'Deep analyzing with Serper + AI...' : 'Analyzing with AI...'}
+                  </p>
                 </div>
               )}
 
-              {!loading && results && <AnalysisResults results={results} />}
+              {!loading && !deepLoading && activeSubTab === 'form' && results && (
+                <AnalysisResults results={results} />
+              )}
 
-              {!loading && !results && !error && (
-                <div className="glass rounded-2xl p-12 text-center">
-                  <Search className="w-16 h-16 mx-auto text-slate-600 mb-4" />
-                  <h3 className="text-xl font-semibold text-slate-400 mb-2">Ready to Analyze</h3>
-                  <p className="text-slate-500">Fill out the campaign form to get AI-powered predictions</p>
+              {!loading && !deepLoading && activeSubTab === 'form' && deepResults && (
+                <DeepAnalysisResults results={deepResults} />
+              )}
+
+              {!loading && !deepLoading && activeSubTab === 'upload' && postResults && (
+                <PostAnalysisResult result={postResults} />
+              )}
+
+              {!loading && !deepLoading && !results && !deepResults && !postResults && !error && (
+                <div className="glass p-12 text-center">
+                  <Search className="w-12 h-12 mx-auto text-neutral-700 mb-4" />
+                  <p className="text-neutral-500">Fill the form or upload a post to analyze</p>
                 </div>
               )}
             </div>
@@ -729,9 +1338,9 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/50 mt-16">
-        <div className="max-w-7xl mx-auto px-6 py-6 text-center text-slate-500 text-sm">
-          TrendGuard v3.0 — Powered by Gemini AI with Google Search Grounding
+      <footer className="border-t border-neutral-800 mt-16">
+        <div className="max-w-6xl mx-auto px-6 py-5 text-center text-neutral-600 text-sm">
+          TrendGuard v4 — Powered by Gemini AI
         </div>
       </footer>
     </div>
