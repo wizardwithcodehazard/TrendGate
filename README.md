@@ -1,6 +1,6 @@
 <div align="center">
 
-![TrendGate Banner](./trendgate_banner.png)
+
 # 🚀 TrendGate
 ### *The AI That Tells You When Your Trend Is About to Die — Before It Does*
 <br/>
