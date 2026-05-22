@@ -1,13 +1,8 @@
 <div align="center">
 
 ![TrendGate Banner](./trendgate_banner.png)
-
-<br/>
-
 # 🚀 TrendGate
-
 ### *The AI That Tells You When Your Trend Is About to Die — Before It Does*
-
 <br/>
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
